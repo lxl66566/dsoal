@@ -576,7 +576,7 @@ HRESULT Buffer::setLocation(LocStatus locStatus) noexcept
     if(mSource == 0)
         alGenSourcesDirect(mContext, 1, &mSource);
     alSourcefDirect(mContext, mSource, AL_GAIN, mB_to_gain(mVolume));
-    alSourcefDirect(mContext, mSource, AL_PITCH, (mFrequency == 0) ? 1.0f :
+    alSourcefDirect(mContext, mSource, AL_PITCH, (mFrequency == 0) ? 2.0f :
         static_cast<float>(mFrequency)/static_cast<float>(mBuffer->mWfxFormat.Format.nSamplesPerSec));
 
     if((mBuffer->mFlags&DSBCAPS_CTRL3D))
@@ -1227,7 +1227,7 @@ HRESULT STDMETHODCALLTYPE Buffer::SetFrequency(DWORD frequency) noexcept
     mFrequency = frequency ? frequency : mBuffer->mWfxFormat.Format.nSamplesPerSec;
     if(mSource != 0)
     {
-        const float pitch{static_cast<float>(mFrequency) /
+        const float pitch{2.0f * static_cast<float>(mFrequency) /
             static_cast<float>(mBuffer->mWfxFormat.Format.nSamplesPerSec)};
         alSourcefDirect(mContext, mSource, AL_PITCH, pitch);
     }

@@ -9,8 +9,8 @@ on:
     paths-ignore:
       - '.github/workflows/Tagged.yaml'
   workflow_dispatch:
-  schedule:
-  - cron: '0 0 * * *'
+  # schedule:
+  # - cron: '0 0 * * *'
 
 env:
   Configuration: Release
@@ -62,8 +62,25 @@ jobs:
 
     - name: Build DSOAL
       run: |
+        # 首先，运行一次cmake配置
         cmake -B "${{github.workspace}}/build" -A ${{matrix.config.platform}}
-        cmake --build "${{github.workspace}}/build" --config ${{env.Configuration}}
+
+        # 循环遍历不同的SPEEDUP值
+        for i in $(seq 10 1 25)
+        do
+          SPEEDUP_VAL="${i:0:1}.${i:1}"
+          echo "Building DSOAL with SPEEDUP = ${SPEEDUP_VAL}f"
+
+          # 使用sed命令替换源文件中的SPEEDUP定义行
+          sed -i "s/^#define SPEEDUP .*f/#define SPEEDUP ${SPEEDUP_VAL}f/" src/buffer.cpp
+
+          # 构建项目，这将复用现有的配置和缓存
+          cmake --build "${{github.workspace}}/build" --config ${{env.Configuration}}
+
+          # 移动并重命名编译好的DLL，使其包含SPEEDUP值
+          mv "${{github.workspace}}/build/${{env.Configuration}}/dsound.dll" "${{github.workspace}}/build/${{env.Configuration}}/dsound-${SPEEDUP_VAL}.dll"
+        done
+      shell: bash
 
     - name: Build OpenAL Soft
       run: |
@@ -74,7 +91,7 @@ jobs:
       run: |
         mkdir "DSOAL"
         mkdir "DSOAL/Documentation"
-        move "${{github.workspace}}/build/${{env.Configuration}}/dsound.dll"                                   "DSOAL/dsound.dll"
+        move "${{github.workspace}}/build/${{env.Configuration}}/dsound-*.dll"                                 "DSOAL/"
         move "${{github.workspace}}/openal-soft/build/${{env.Configuration}}/soft_oal.dll"                     "DSOAL/dsoal-aldrv.dll"
         copy "${{github.workspace}}/openal-soft/alsoftrc.sample"                                               "DSOAL/alsoft.ini"
         copy "${{github.workspace}}/README.md"                                                                 "DSOAL/Documentation/DSOAL-ReadMe.txt"

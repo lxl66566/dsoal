@@ -577,8 +577,10 @@ HRESULT Buffer::setLocation(LocStatus locStatus) noexcept
     if(mSource == 0)
         alGenSourcesDirect(mContext, 1, &mSource);
     alSourcefDirect(mContext, mSource, AL_GAIN, mB_to_gain(mVolume));
-    alSourcefDirect(mContext, mSource, AL_PITCH, (mFrequency == 0) ? SPEEDUP :
-        static_cast<float>(mFrequency)/static_cast<float>(mBuffer->mWfxFormat.Format.nSamplesPerSec));
+    const float basePitch = (mFrequency == 0) ? 1.0f : 
+    static_cast<float>(mFrequency) / static_cast<float>(mBuffer->mWfxFormat.Format.nSamplesPerSec);
+    const float finalPitch = SPEEDUP * basePitch;
+    alSourcefDirect(mContext, mSource, AL_PITCH, finalPitch);
 
     if((mBuffer->mFlags&DSBCAPS_CTRL3D))
     {
@@ -781,7 +783,15 @@ HRESULT STDMETHODCALLTYPE Buffer::GetCurrentPosition(DWORD *playCursor, DWORD *w
     if(status == AL_PLAYING)
     {
         pos = static_cast<ALuint>(ofs);
-        writecursor = format.nSamplesPerSec / mParent.getRefresh() * format.nBlockAlign;
+
+        // Calculate effective pitch factor (include SPEEDUP)
+        const float basePitch = (mFrequency == 0) ? 1.0f : 
+            static_cast<float>(mFrequency) / static_cast<float>(format.nSamplesPerSec);
+        const float effectivePitch = SPEEDUP * basePitch;
+
+        // Adjust write cursor offset by pitch to maintain correct time margin
+        const float baseOffset = static_cast<float>(format.nSamplesPerSec) / mParent.getRefresh() * format.nBlockAlign;
+        writecursor = static_cast<DWORD>(baseOffset * effectivePitch);
         writecursor += pos;
     }
     else
@@ -1228,9 +1238,9 @@ HRESULT STDMETHODCALLTYPE Buffer::SetFrequency(DWORD frequency) noexcept
     mFrequency = frequency ? frequency : mBuffer->mWfxFormat.Format.nSamplesPerSec;
     if(mSource != 0)
     {
-        const float pitch{SPEEDUP * static_cast<float>(mFrequency) /
-            static_cast<float>(mBuffer->mWfxFormat.Format.nSamplesPerSec)};
-        alSourcefDirect(mContext, mSource, AL_PITCH, pitch);
+        const float basePitch = static_cast<float>(mFrequency) / static_cast<float>(mBuffer->mWfxFormat.Format.nSamplesPerSec);
+        const float finalPitch = SPEEDUP * basePitch;
+        alSourcefDirect(mContext, mSource, AL_PITCH, finalPitch);
     }
 
     return DS_OK;
